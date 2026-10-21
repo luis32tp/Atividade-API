@@ -1,0 +1,799 @@
+{
+  "info": {
+    "name": "API de Produtos — Atividade de Back-end",
+    "description": "Coleção acadêmica para a API Laravel com persistência em storage/app/produtos.json. Execute a coleção inteira em ordem, com 1 iteração. O POST inicial cadastra um produto de demonstração e salva seu ID; o DELETE exclui somente esse produto. Os demais cadastros permanecem no arquivo. Requisições dependentes são puladas se não houver ID válido. Se interromper a execução antes do DELETE, exclua manualmente o produto criado usando o ID salvo. A última requisição depende do acesso à internet para consultar JSONPlaceholder.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api",
+      "type": "string"
+    },
+    {
+      "key": "produto_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "produto_excluido",
+      "value": "false",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 — CRUD e validações (executar em ordem)",
+      "item": [
+        {
+          "name": "01 — Cadastrar produto e salvar seu ID (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/produtos",
+            "description": "Cria o produto solicitado na atividade e salva data.id em produto_id. Execute antes das operações dependentes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Notebook Acer Nitro V15\",\n  \"preco\": 4500,\n  \"estoque\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"produto_id\", \"\");",
+                  "pm.collectionVariables.set(\"produto_excluido\", \"false\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Resposta com Content-Type application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Corpo é um JSON válido\", function () {",
+                  "    pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test(\"Resource contém os campos e tipos do produto\", function () {",
+                  "    const produto = pm.response.json().data;",
+                  "    pm.expect(produto).to.have.all.keys(\"id\", \"nome\", \"preco\", \"estoque\");",
+                  "    pm.expect(produto.id).to.be.a(\"number\");",
+                  "    pm.expect(Number.isInteger(produto.id)).to.eql(true);",
+                  "    pm.expect(produto.id).to.be.above(0);",
+                  "    pm.expect(produto.nome).to.be.a(\"string\");",
+                  "    pm.expect(produto.preco).to.be.a(\"number\");",
+                  "    pm.expect(produto.estoque).to.be.a(\"number\");",
+                  "    pm.expect(Number.isInteger(produto.estoque)).to.eql(true);",
+                  "});",
+                  "pm.test(\"Cadastro retorna os dados enviados e salva o ID\", function () {",
+                  "    const produto = pm.response.json().data;",
+                  "    pm.expect(pm.response.code).to.eql(201);",
+                  "    pm.expect(Number.isInteger(produto.id) && produto.id > 0).to.eql(true);",
+                  "    pm.expect(produto.nome).to.eql(\"Notebook Acer Nitro V15\");",
+                  "    pm.expect(produto.preco).to.eql(4500);",
+                  "    pm.expect(produto.estoque).to.eql(5);",
+                  "    pm.collectionVariables.set(\"produto_id\", String(produto.id));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 — Listar produtos e localizar o cadastro (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/produtos",
+            "description": "Confere o envelope data e que o produto criado está na listagem."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const produtoId = String(pm.collectionVariables.get(\"produto_id\") || \"\");",
+                  "if (!/^[1-9][0-9]*$/.test(produtoId)) {",
+                  "    console.warn(\"Execute primeiro a requisição 01 — Cadastrar produto. Nenhum ID válido foi salvo.\");",
+                  "    pm.execution.skipRequest();",
+                  "}",
+                  "pm.variables.set(\"produto_id\", produtoId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Resposta com Content-Type application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Corpo é um JSON válido\", function () {",
+                  "    pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test(\"Lista contém o produto recém-cadastrado\", function () {",
+                  "    const produtos = pm.response.json().data;",
+                  "    pm.expect(produtos).to.be.an(\"array\");",
+                  "    const produto = produtos.find(function (item) { return item.id === Number(pm.collectionVariables.get(\"produto_id\")); });",
+                  "    pm.expect(produto).to.deep.eql({ id: Number(pm.collectionVariables.get(\"produto_id\")), nome: \"Notebook Acer Nitro V15\", preco: 4500, estoque: 5 });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 — Buscar produto pelo ID salvo (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/produtos/{{produto_id}}",
+            "description": "Busca o ID devolvido pelo POST, sem depender de ID fixo."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const produtoId = String(pm.collectionVariables.get(\"produto_id\") || \"\");",
+                  "if (!/^[1-9][0-9]*$/.test(produtoId)) {",
+                  "    console.warn(\"Execute primeiro a requisição 01 — Cadastrar produto. Nenhum ID válido foi salvo.\");",
+                  "    pm.execution.skipRequest();",
+                  "}",
+                  "pm.variables.set(\"produto_id\", produtoId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Resposta com Content-Type application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Corpo é um JSON válido\", function () {",
+                  "    pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test(\"Resource contém os campos e tipos do produto\", function () {",
+                  "    const produto = pm.response.json().data;",
+                  "    pm.expect(produto).to.have.all.keys(\"id\", \"nome\", \"preco\", \"estoque\");",
+                  "    pm.expect(produto.id).to.be.a(\"number\");",
+                  "    pm.expect(Number.isInteger(produto.id)).to.eql(true);",
+                  "    pm.expect(produto.id).to.be.above(0);",
+                  "    pm.expect(produto.nome).to.be.a(\"string\");",
+                  "    pm.expect(produto.preco).to.be.a(\"number\");",
+                  "    pm.expect(produto.estoque).to.be.a(\"number\");",
+                  "    pm.expect(Number.isInteger(produto.estoque)).to.eql(true);",
+                  "});",
+                  "pm.test(\"Produto possui os valores esperados\", function () {",
+                  "    const produto = pm.response.json().data;",
+                  "    pm.expect(produto.id).to.eql(Number(pm.collectionVariables.get(\"produto_id\")));",
+                  "    pm.expect(produto.nome).to.eql(\"Notebook Acer Nitro V15\");",
+                  "    pm.expect(produto.preco).to.eql(4500);",
+                  "    pm.expect(produto.estoque).to.eql(5);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 — Atualizar nome, preço e estoque com PUT (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/produtos/{{produto_id}}",
+            "description": "Envia o produto atualizado pedido na atividade.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Notebook Acer Nitro V15\",\n  \"preco\": 4200,\n  \"estoque\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const produtoId = String(pm.collectionVariables.get(\"produto_id\") || \"\");",
+                  "if (!/^[1-9][0-9]*$/.test(produtoId)) {",
+                  "    console.warn(\"Execute primeiro a requisição 01 — Cadastrar produto. Nenhum ID válido foi salvo.\");",
+                  "    pm.execution.skipRequest();",
+                  "}",
+                  "pm.variables.set(\"produto_id\", produtoId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Resposta com Content-Type application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Corpo é um JSON válido\", function () {",
+                  "    pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test(\"Resource contém os campos e tipos do produto\", function () {",
+                  "    const produto = pm.response.json().data;",
+                  "    pm.expect(produto).to.have.all.keys(\"id\", \"nome\", \"preco\", \"estoque\");",
+                  "    pm.expect(produto.id).to.be.a(\"number\");",
+                  "    pm.expect(Number.isInteger(produto.id)).to.eql(true);",
+                  "    pm.expect(produto.id).to.be.above(0);",
+                  "    pm.expect(produto.nome).to.be.a(\"string\");",
+                  "    pm.expect(produto.preco).to.be.a(\"number\");",
+                  "    pm.expect(produto.estoque).to.be.a(\"number\");",
+                  "    pm.expect(Number.isInteger(produto.estoque)).to.eql(true);",
+                  "});",
+                  "pm.test(\"Produto possui os valores esperados\", function () {",
+                  "    const produto = pm.response.json().data;",
+                  "    pm.expect(produto.id).to.eql(Number(pm.collectionVariables.get(\"produto_id\")));",
+                  "    pm.expect(produto.nome).to.eql(\"Notebook Acer Nitro V15\");",
+                  "    pm.expect(produto.preco).to.eql(4200);",
+                  "    pm.expect(produto.estoque).to.eql(8);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 — Atualizar somente o estoque com PATCH (200)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/produtos/{{produto_id}}",
+            "description": "Demonstra atualização parcial. Mantém os valores finais solicitados: preço 4200 e estoque 8.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estoque\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const produtoId = String(pm.collectionVariables.get(\"produto_id\") || \"\");",
+                  "if (!/^[1-9][0-9]*$/.test(produtoId)) {",
+                  "    console.warn(\"Execute primeiro a requisição 01 — Cadastrar produto. Nenhum ID válido foi salvo.\");",
+                  "    pm.execution.skipRequest();",
+                  "}",
+                  "pm.variables.set(\"produto_id\", produtoId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Resposta com Content-Type application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Corpo é um JSON válido\", function () {",
+                  "    pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test(\"Resource contém os campos e tipos do produto\", function () {",
+                  "    const produto = pm.response.json().data;",
+                  "    pm.expect(produto).to.have.all.keys(\"id\", \"nome\", \"preco\", \"estoque\");",
+                  "    pm.expect(produto.id).to.be.a(\"number\");",
+                  "    pm.expect(Number.isInteger(produto.id)).to.eql(true);",
+                  "    pm.expect(produto.id).to.be.above(0);",
+                  "    pm.expect(produto.nome).to.be.a(\"string\");",
+                  "    pm.expect(produto.preco).to.be.a(\"number\");",
+                  "    pm.expect(produto.estoque).to.be.a(\"number\");",
+                  "    pm.expect(Number.isInteger(produto.estoque)).to.eql(true);",
+                  "});",
+                  "pm.test(\"Produto possui os valores esperados\", function () {",
+                  "    const produto = pm.response.json().data;",
+                  "    pm.expect(produto.id).to.eql(Number(pm.collectionVariables.get(\"produto_id\")));",
+                  "    pm.expect(produto.nome).to.eql(\"Notebook Acer Nitro V15\");",
+                  "    pm.expect(produto.preco).to.eql(4200);",
+                  "    pm.expect(produto.estoque).to.eql(8);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 — Conferir atualização em nova consulta (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/produtos/{{produto_id}}",
+            "description": "Uma nova requisição GET verifica se os dados atualizados continuam disponíveis."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const produtoId = String(pm.collectionVariables.get(\"produto_id\") || \"\");",
+                  "if (!/^[1-9][0-9]*$/.test(produtoId)) {",
+                  "    console.warn(\"Execute primeiro a requisição 01 — Cadastrar produto. Nenhum ID válido foi salvo.\");",
+                  "    pm.execution.skipRequest();",
+                  "}",
+                  "pm.variables.set(\"produto_id\", produtoId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Resposta com Content-Type application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Corpo é um JSON válido\", function () {",
+                  "    pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test(\"Resource contém os campos e tipos do produto\", function () {",
+                  "    const produto = pm.response.json().data;",
+                  "    pm.expect(produto).to.have.all.keys(\"id\", \"nome\", \"preco\", \"estoque\");",
+                  "    pm.expect(produto.id).to.be.a(\"number\");",
+                  "    pm.expect(Number.isInteger(produto.id)).to.eql(true);",
+                  "    pm.expect(produto.id).to.be.above(0);",
+                  "    pm.expect(produto.nome).to.be.a(\"string\");",
+                  "    pm.expect(produto.preco).to.be.a(\"number\");",
+                  "    pm.expect(produto.estoque).to.be.a(\"number\");",
+                  "    pm.expect(Number.isInteger(produto.estoque)).to.eql(true);",
+                  "});",
+                  "pm.test(\"Produto possui os valores esperados\", function () {",
+                  "    const produto = pm.response.json().data;",
+                  "    pm.expect(produto.id).to.eql(Number(pm.collectionVariables.get(\"produto_id\")));",
+                  "    pm.expect(produto.nome).to.eql(\"Notebook Acer Nitro V15\");",
+                  "    pm.expect(produto.preco).to.eql(4200);",
+                  "    pm.expect(produto.estoque).to.eql(8);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 — Recusar cadastro sem campos obrigatórios (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/produtos",
+            "description": "Payload vazio deve retornar erros de nome, preco e estoque, sem criar um produto.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 422\", function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});",
+                  "pm.test(\"Resposta com Content-Type application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Corpo é um JSON válido\", function () {",
+                  "    pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test(\"Validação informa erros de nome, preço e estoque\", function () {",
+                  "    const resposta = pm.response.json();",
+                  "    pm.expect(resposta.message).to.be.a(\"string\").and.not.empty;",
+                  "    [\"nome\", \"preco\", \"estoque\"].forEach(function (campo) {",
+                  "        pm.expect(resposta.errors[campo]).to.be.an(\"array\").that.is.not.empty;",
+                  "        pm.expect(resposta.errors[campo][0]).to.be.a(\"string\").and.not.empty;",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 — Recusar atualização com dados inválidos (422)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/produtos/{{produto_id}}",
+            "description": "Nome vazio, preço negativo e estoque negativo devem ser recusados.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"\",\n  \"preco\": -1,\n  \"estoque\": -1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const produtoId = String(pm.collectionVariables.get(\"produto_id\") || \"\");",
+                  "if (!/^[1-9][0-9]*$/.test(produtoId)) {",
+                  "    console.warn(\"Execute primeiro a requisição 01 — Cadastrar produto. Nenhum ID válido foi salvo.\");",
+                  "    pm.execution.skipRequest();",
+                  "}",
+                  "pm.variables.set(\"produto_id\", produtoId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 422\", function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});",
+                  "pm.test(\"Resposta com Content-Type application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Corpo é um JSON válido\", function () {",
+                  "    pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test(\"Validação informa erros de nome, preço e estoque\", function () {",
+                  "    const resposta = pm.response.json();",
+                  "    pm.expect(resposta.message).to.be.a(\"string\").and.not.empty;",
+                  "    [\"nome\", \"preco\", \"estoque\"].forEach(function (campo) {",
+                  "        pm.expect(resposta.errors[campo]).to.be.an(\"array\").that.is.not.empty;",
+                  "        pm.expect(resposta.errors[campo][0]).to.be.a(\"string\").and.not.empty;",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 — Conferir que a falha de validação preservou os dados (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/produtos/{{produto_id}}",
+            "description": "Confere que o PATCH inválido não alterou o produto cadastrado pela coleção."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const produtoId = String(pm.collectionVariables.get(\"produto_id\") || \"\");",
+                  "if (!/^[1-9][0-9]*$/.test(produtoId)) {",
+                  "    console.warn(\"Execute primeiro a requisição 01 — Cadastrar produto. Nenhum ID válido foi salvo.\");",
+                  "    pm.execution.skipRequest();",
+                  "}",
+                  "pm.variables.set(\"produto_id\", produtoId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Resposta com Content-Type application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Corpo é um JSON válido\", function () {",
+                  "    pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test(\"Resource contém os campos e tipos do produto\", function () {",
+                  "    const produto = pm.response.json().data;",
+                  "    pm.expect(produto).to.have.all.keys(\"id\", \"nome\", \"preco\", \"estoque\");",
+                  "    pm.expect(produto.id).to.be.a(\"number\");",
+                  "    pm.expect(Number.isInteger(produto.id)).to.eql(true);",
+                  "    pm.expect(produto.id).to.be.above(0);",
+                  "    pm.expect(produto.nome).to.be.a(\"string\");",
+                  "    pm.expect(produto.preco).to.be.a(\"number\");",
+                  "    pm.expect(produto.estoque).to.be.a(\"number\");",
+                  "    pm.expect(Number.isInteger(produto.estoque)).to.eql(true);",
+                  "});",
+                  "pm.test(\"Produto possui os valores esperados\", function () {",
+                  "    const produto = pm.response.json().data;",
+                  "    pm.expect(produto.id).to.eql(Number(pm.collectionVariables.get(\"produto_id\")));",
+                  "    pm.expect(produto.nome).to.eql(\"Notebook Acer Nitro V15\");",
+                  "    pm.expect(produto.preco).to.eql(4200);",
+                  "    pm.expect(produto.estoque).to.eql(8);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 — Excluir somente o produto criado pela coleção (204)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/produtos/{{produto_id}}",
+            "description": "Exclui apenas o ID salvo pelo POST. A resposta 204 deve estar vazia."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const produtoId = String(pm.collectionVariables.get(\"produto_id\") || \"\");",
+                  "if (!/^[1-9][0-9]*$/.test(produtoId)) {",
+                  "    console.warn(\"Execute primeiro a requisição 01 — Cadastrar produto. Nenhum ID válido foi salvo.\");",
+                  "    pm.execution.skipRequest();",
+                  "}",
+                  "pm.variables.set(\"produto_id\", produtoId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 204\", function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});",
+                  "pm.test(\"Resposta 204 tem corpo vazio\", function () {",
+                  "    pm.expect(pm.response.text()).to.eql(\"\");",
+                  "});",
+                  "if (pm.response.code === 204) {",
+                  "    pm.collectionVariables.set(\"produto_excluido\", \"true\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 — Buscar o produto excluído e receber erro (404)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/produtos/{{produto_id}}",
+            "description": "Usa o ID efetivamente excluído na etapa anterior para comprovar o 404 sem escolher um ID fixo."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const produtoId = String(pm.collectionVariables.get(\"produto_id\") || \"\");",
+                  "if (!/^[1-9][0-9]*$/.test(produtoId)) {",
+                  "    console.warn(\"Execute primeiro a requisição 01 — Cadastrar produto. Nenhum ID válido foi salvo.\");",
+                  "    pm.execution.skipRequest();",
+                  "}",
+                  "pm.variables.set(\"produto_id\", produtoId);",
+                  "if (pm.collectionVariables.get(\"produto_excluido\") !== \"true\") {",
+                  "    console.warn(\"Execute primeiro a requisição 10 — Excluir produto. O teste 404 depende da exclusão concluída.\");",
+                  "    pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "pm.test(\"Resposta com Content-Type application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Corpo é um JSON válido\", function () {",
+                  "    pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test(\"Erro informa que o produto não foi encontrado\", function () {",
+                  "    pm.expect(pm.response.json().mensagem).to.eql(\"Produto não encontrado\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 — Consumo da API externa",
+      "item": [
+        {
+          "name": "12 — Consultar usuários do JSONPlaceholder (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{base_url}}/usuarios-externos",
+            "description": "O Laravel consulta https://jsonplaceholder.typicode.com/users. Esta verificação requer conexão à internet e disponibilidade da API externa."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status HTTP 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test(\"Resposta com Content-Type application/json\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "});",
+                  "pm.test(\"Corpo é um JSON válido\", function () {",
+                  "    pm.expect(function () { pm.response.json(); }).not.to.throw();",
+                  "});",
+                  "pm.test(\"Resposta contém uma lista de usuários externos\", function () {",
+                  "    const usuarios = pm.response.json();",
+                  "    pm.expect(usuarios).to.be.an(\"array\").that.is.not.empty;",
+                  "    usuarios.forEach(function (usuario) {",
+                  "        pm.expect(usuario).to.include.all.keys(\"id\", \"name\", \"email\");",
+                  "        pm.expect(usuario.id).to.be.a(\"number\");",
+                  "        pm.expect(usuario.name).to.be.a(\"string\").and.not.empty;",
+                  "        pm.expect(usuario.email).to.be.a(\"string\").and.not.empty;",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
