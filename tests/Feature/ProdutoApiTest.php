@@ -15,6 +15,8 @@ class ProdutoApiTest extends TestCase
     {
         parent::setUp();
 
+        config(['produtos.driver' => 'json']);
+
         $this->temporaryStoragePath = storage_path('framework/testing/produto-api-'.bin2hex(random_bytes(8)));
         File::ensureDirectoryExists($this->temporaryStoragePath.'/app');
         $this->app->useStoragePath($this->temporaryStoragePath);
@@ -37,6 +39,49 @@ class ProdutoApiTest extends TestCase
         $response->assertOk()->assertExactJson(['data' => $produtos]);
     }
 
+    #[TestWith(['preco_min=50.5', [2, 3, 4]])]
+    #[TestWith(['preco_max=100.75', [1, 2, 3]])]
+    #[TestWith(['preco_min=50.5&preco_max=100.75', [2, 3]])]
+    #[TestWith(['preco_min=0', [1, 2, 3, 4]])]
+    #[TestWith(['preco_max=0', [1]])]
+    #[TestWith(['preco_min=50.5&preco_max=50.5', [2]])]
+    #[TestWith(['preco_min=300', []])]
+    public function test_filters_products_by_inclusive_price_limits(string $query, array $expectedIds): void
+    {
+        $produtos = [
+            ['id' => 1, 'nome' => 'Brinde', 'preco' => 0, 'estoque' => 0],
+            ['id' => 2, 'nome' => 'Mouse', 'preco' => 50.5, 'estoque' => 2],
+            ['id' => 3, 'nome' => 'Teclado', 'preco' => 100.75, 'estoque' => 4],
+            ['id' => 4, 'nome' => 'Monitor', 'preco' => 200, 'estoque' => 1],
+        ];
+        $this->writeProducts($produtos);
+
+        $response = $this->getJson('/api/produtos?'.$query);
+
+        $response->assertOk();
+        $this->assertSame($expectedIds, array_column($response->json('data'), 'id'));
+        $this->assertSame($produtos, $this->readProducts());
+    }
+
+    #[TestWith(['preco_min=caro', 'preco_min'])]
+    #[TestWith(['preco_max=caro', 'preco_max'])]
+    #[TestWith(['preco_min=-1', 'preco_min'])]
+    #[TestWith(['preco_max=-1', 'preco_max'])]
+    #[TestWith(['preco_min=', 'preco_min'])]
+    #[TestWith(['preco_max=', 'preco_max'])]
+    #[TestWith(['preco_min=100&preco_max=50', 'preco_max'])]
+    public function test_rejects_invalid_price_filters_without_changing_products(string $query, string $field): void
+    {
+        $produtos = [['id' => 1, 'nome' => 'Mouse', 'preco' => 40.5, 'estoque' => 2]];
+        $this->writeProducts($produtos);
+
+        $this->getJson('/api/produtos?'.$query)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([$field]);
+
+        $this->assertSame($produtos, $this->readProducts());
+    }
+
     public function test_creates_a_product_returns_201_and_persists_it(): void
     {
         $this->writeProducts([['id' => 7, 'nome' => 'Mouse', 'preco' => 40.5, 'estoque' => 2]]);
@@ -49,6 +94,22 @@ class ProdutoApiTest extends TestCase
             ['id' => 7, 'nome' => 'Mouse', 'preco' => 40.5, 'estoque' => 2],
             ['id' => 8, 'nome' => 'Teclado', 'preco' => 120.5, 'estoque' => 4],
         ], $this->readProducts());
+    }
+
+    public function test_does_not_create_a_product_with_a_negative_price(): void
+    {
+        $this->writeProducts([]);
+
+        $response = $this->postJson('/api/produtos', [
+            'nome' => 'Produto inválido',
+            'preco' => -1,
+            'estoque' => 1,
+        ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['preco'])
+            ->assertJsonPath('errors.preco.0', 'O preço não pode ser negativo.');
+        $this->assertSame([], $this->readProducts());
     }
 
     public function test_returns_the_product_matching_the_requested_id(): void
